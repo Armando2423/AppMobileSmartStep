@@ -1,88 +1,114 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
-  View, Text, StyleSheet, TextInput, Image 
+  View, Text, StyleSheet, TextInput, Image, 
+  KeyboardAvoidingView, ScrollView, Platform, Dimensions 
 } from 'react-native';
 import CircleProgressBar from './CircleProgressBar';
 
 export default function ContadorPasos() {
-  // Estado para el objetivo editable (en pasos)
+  const inputRef = useRef(null);
+  const [currentSteps] = useState(6000);
   const [objective, setObjective] = useState("10000");
-  const currentSteps = 6000; // Pasos actuales (ejemplo)
-  // Convertimos el objetivo a número (o usamos 10000 si falla la conversión)
-  const stepLimit = parseInt(objective) || 10000;
+  const [inputValue, setInputValue] = useState("10000"); // Estado intermedio para evitar renders en cada tecla
 
-  // Íconos para las métricas (calorías, distancia, tiempo)
+  const stepLimit = parseInt(objective) || 10000;
+  const { height } = Dimensions.get('window');
+
   const metricIcons = {
     calories: require('./assets/icons/icon_calories.png'),
     distance: require('./assets/icons/icon_distance.png'),
     time: require('./assets/icons/icon_time.png'),
   };
 
+  // 🛠 Evita renders innecesarios con un debounce (retraso en la actualización del objetivo)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setObjective(inputValue);
+    }, 500); // Espera 500ms después del último cambio
+
+    return () => clearTimeout(timer);
+  }, [inputValue]);
+
+  // ✅ Memoriza el progreso para evitar renders innecesarios
+  const ProgressCircle = useMemo(() => (
+    <CircleProgressBar 
+      progress={currentSteps} 
+      limit={stepLimit} 
+      size={250} 
+      strokeWidth={20} 
+    />
+  ), [stepLimit]);
+
   return (
-    <View style={styles.container}>
-      <View style={styles.topContainer}>
-        <CircleProgressBar 
-          progress={currentSteps} 
-          limit={stepLimit} 
-          size={250} 
-          strokeWidth={20} 
-        />
-      </View>
-      <View style={styles.bottomContainer}>
-        {/* Área del objetivo: etiqueta y campo editable en columna, centrados */}
-        <View style={styles.objectiveContainer}>
-          <Text style={styles.objectiveLabel}>Objetivo:</Text>
-          <TextInput
-            style={styles.objectiveInput}
-            value={objective}
-            onChangeText={setObjective}
-            keyboardType="numeric"
-          />
-        </View>
-        {/* Fila de métricas con íconos en círculos */}
-        <View style={styles.metricsRow}>
-          <View style={styles.metricItem}>
-            <View style={styles.iconCircle}>
-              <Image source={metricIcons.calories} style={styles.metricIcon} />
-            </View>
-            <Text style={styles.metricValue}>0 cal</Text>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: '#EAEAEA' }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 20}
+    >
+      <ScrollView 
+        contentContainerStyle={[styles.scrollContainer, { minHeight: height, paddingBottom: 100 }]} 
+        keyboardShouldPersistTaps="handled"
+        contentInsetAdjustmentBehavior="automatic"
+      >
+        <View style={styles.container}>
+          <View style={styles.topContainer}>
+            {ProgressCircle}
           </View>
-          <View style={styles.metricItem}>
-            <View style={styles.iconCircle}>
-              <Image source={metricIcons.distance} style={styles.metricIcon} />
+          <View style={styles.bottomContainer}>
+            <View style={styles.objectiveContainer}>
+              <Text style={styles.objectiveLabel}>Objetivo:</Text>
+              <TextInput
+                ref={inputRef}
+                style={styles.objectiveInput}
+                value={inputValue}
+                onChangeText={setInputValue} // Solo cambia el estado temporal
+                keyboardType="numeric"
+                returnKeyType="done"
+                blurOnSubmit={true} 
+              />
             </View>
-            <Text style={styles.metricValue}>0 km</Text>
-          </View>
-          <View style={styles.metricItem}>
-            <View style={styles.iconCircle}>
-              <Image source={metricIcons.time} style={styles.metricIcon} />
+            <View style={styles.metricsRow}>
+              <MetricItem icon={metricIcons.calories} value="0 cal" />
+              <MetricItem icon={metricIcons.distance} value="0 km" />
+              <MetricItem icon={metricIcons.time} value="0 h" />
             </View>
-            <Text style={styles.metricValue}>0 h</Text>
           </View>
         </View>
-      </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
+// ✅ Memoriza cada métrica para evitar renders innecesarios
+const MetricItem = React.memo(({ icon, value }) => (
+  <View style={styles.metricItem}>
+    <View style={styles.iconCircle}>
+      <Image source={icon} style={styles.metricIcon} />
+    </View>
+    <Text style={styles.metricValue}>{value}</Text>
+  </View>
+));
+
 const styles = StyleSheet.create({
+  scrollContainer: {
+    flexGrow: 1,
+  },
   container: { 
-    flex: 1, 
+    top: 100,
     backgroundColor: '#EAEAEA',
-    paddingBottom: 120,
   },
   topContainer: { 
-    flex: 1, 
+    height: 300, 
     justifyContent: 'flex-end', 
     alignItems: 'center', 
     paddingBottom: 20,
   },
   bottomContainer: { 
-    flex: 0.75, // Contenedor inferior menos alto
     backgroundColor: '#fff', 
     borderRadius: 10, 
     padding: 20,
     marginHorizontal: 20,
+    marginTop: 20,
     justifyContent: 'center',
   },
   objectiveContainer: {
