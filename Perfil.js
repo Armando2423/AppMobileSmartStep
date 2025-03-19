@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  View, Text, StyleSheet, Image, TextInput, 
-  TouchableOpacity, ScrollView, StatusBar
+  View, Text, StyleSheet, Image, TextInput, TouchableOpacity, StatusBar, Alert 
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useRoute } from '@react-navigation/native';
 
 const icons = {
   user: require('./assets/icons/icon_user.png'),
@@ -14,59 +15,130 @@ const icons = {
 };
 
 export default function Perfil() {
+  const route = useRoute();
+  const userId = route.params?.userId; 
+
   const [editable, setEditable] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [profileAge, setProfileAge] = useState('');
+  const [profileWeight, setProfileWeight] = useState('');
+  const [profileHeight, setProfileHeight] = useState('');
 
   const toggleEdit = () => setEditable(true);
-  const saveChanges = () => setEditable(false);
+
+  const saveChanges = async () => {
+    try {
+      const response = await fetch('http://192.168.0.11:3000/perfil', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          name: profileName,
+          age: profileAge,
+          weight: profileWeight,
+          height: profileHeight,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server error: ${errorText}`);
+      }
+
+      const json = await response.json();
+      //console.log("Respuesta del servidor:", json);
+      if (json.success) {
+        Alert.alert("Éxito", "Perfil actualizado correctamente.");
+        setEditable(false);
+      } else {
+        Alert.alert("Error", json.error || "No se pudo actualizar el perfil.");
+      }
+    } catch (error) {
+      Alert.alert("Error", "Error al actualizar el perfil.");
+      console.error("Error en actualizar perfil:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (userId) {
+      fetch(`http://192.168.0.11:3000/perfil?userId=${userId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.perfil) {
+            setProfileName(data.perfil.name || '');
+            setProfileAge(data.perfil.age || '');
+            setProfileWeight(data.perfil.weight || '');
+            setProfileHeight(data.perfil.height || '');
+          }
+        })
+        .catch((error) => {
+          console.error("Error al cargar perfil:", error);
+        });
+    }
+  }, [userId]);
+
+  const handleNumericInput = (text, setFunction, allowDecimal = false) => {
+    let filteredText = text.replace(allowDecimal ? /[^0-9.]/g : /[^0-9]/g, '');
+    setFunction(filteredText);
+  };
+
+  const renderField = (label, icon, value, onChangeText, isNumeric = false, allowDecimal = false) => (
+    <View style={styles.fieldContainer} key={label}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.inputWrapper}>
+        <Image source={icon} style={styles.fieldIcon} />
+        <TextInput 
+          style={styles.fieldInput} 
+          editable={editable} 
+          value={value}
+          keyboardType={isNumeric ? 'numeric' : 'default'}
+          onChangeText={(text) => isNumeric ? handleNumericInput(text, onChangeText, allowDecimal) : onChangeText(text)}
+        />
+      </View>
+    </View>
+  );
 
   return (
-    <View style={styles.container}>
+    <View style={{ flex: 1, backgroundColor: '#EAEAEA' }}>
       <StatusBar barStyle="light-content" backgroundColor="#2b2b2b" />
-
-      {/* Sección superior */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mi información</Text>
-        <Image source={icons.user} style={styles.profileIcon} />
-        {!editable && (
-          <TouchableOpacity onPress={toggleEdit} style={styles.editButton}>
-            <MaterialIcons name="edit" size={20} color="#0077CC" />
-            <Text style={styles.editText}>Editar perfil</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Sección inferior con los campos */}
-      <ScrollView style={styles.profileDetails}>
-        {renderField('Nombre', icons.name, editable)}
-        {renderField('Edad', icons.age, editable)}
-        {renderField('Peso', icons.weight, editable)}
-        {renderField('Estatura', icons.height, editable)}
-
-        {/* Botón Guardar (se muestra solo cuando está en modo edición) */}
-        {editable && (
-          <TouchableOpacity style={styles.saveButton} onPress={saveChanges}>
-            <Text style={styles.saveButtonText}>Guardar</Text>
-          </TouchableOpacity>
-        )}
-      </ScrollView>
+      <KeyboardAwareScrollView 
+        contentContainerStyle={styles.scrollContainer} 
+        extraScrollHeight={100}
+        enableOnAndroid={true}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Mi información</Text>
+            <Image source={icons.user} style={styles.profileIcon} />
+            {!editable && (
+              <TouchableOpacity onPress={toggleEdit} style={styles.editButton}>
+                <MaterialIcons name="edit" size={20} color="#0077CC" />
+                <Text style={styles.editText}>Editar perfil</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={styles.profileDetails}>
+            {renderField('Nombre', icons.name, profileName, setProfileName)}
+            {renderField('Edad', icons.age, profileAge, setProfileAge, true)}
+            {renderField('Peso (kg)', icons.weight, profileWeight, setProfileWeight, true, true)}
+            {renderField('Estatura (cm)', icons.height, profileHeight, setProfileHeight, true, true)}
+            {editable && (
+              <TouchableOpacity style={styles.saveButton} onPress={saveChanges}>
+                <Text style={styles.saveButtonText}>Guardar</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
 
-// Función para renderizar cada campo de perfil
-const renderField = (placeholder, icon, editable) => (
-  <View style={styles.fieldContainer} key={placeholder}>
-    <Image source={icon} style={styles.fieldIcon} />
-    <TextInput 
-      style={styles.fieldInput} 
-      placeholder={placeholder} 
-      placeholderTextColor="#999" 
-      editable={editable} 
-    />
-  </View>
-);
-
 const styles = StyleSheet.create({
+  scrollContainer: {
+    flexGrow: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#EAEAEA',
@@ -74,8 +146,6 @@ const styles = StyleSheet.create({
     paddingTop: 80,
     paddingBottom: 100,
   },
-  
-  // 🎨 Estilos de la sección superior
   header: {
     backgroundColor: '#fff',
     alignItems: 'center',
@@ -109,8 +179,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 5,
   },
-
-  // 🎨 Estilos de los campos de perfil
   profileDetails: {
     backgroundColor: '#fff',
     padding: 20,
@@ -118,9 +186,17 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   fieldContainer: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#555',
+    marginBottom: 5,
+  },
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 25,
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
     paddingBottom: 8,
@@ -137,8 +213,6 @@ const styles = StyleSheet.create({
     color: '#333',
     paddingVertical: 5,
   },
-
-  // 🎨 Estilos del botón "Guardar"
   saveButton: {
     backgroundColor: '#59bd73',
     paddingVertical: 12,

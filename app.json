@@ -20,7 +20,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff",
         "softwareKeyboardLayoutMode": "pan"
-      }
+      },
+      "package": "com.armando_reyes5.smartstepapp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
