@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { 
-  View, Text, StyleSheet, Image, TouchableOpacity, StatusBar, TextInput, Animated, Easing 
+  View, Text, StyleSheet, Image, TouchableOpacity, StatusBar, TextInput, Animated, Easing, KeyboardAvoidingView, ScrollView, Platform 
 } from 'react-native';
 
 export default function DistribucionFuerza() {
@@ -99,7 +99,6 @@ export default function DistribucionFuerza() {
       easing: Easing.linear,
       useNativeDriver: false, // para la interpolación de color
     }).start(() => {
-      // Al finalizar, detenemos la animación de la línea y reiniciamos el análisis
       if (scanAnimRef.current) {
         scanAnimRef.current.stop();
       }
@@ -111,14 +110,12 @@ export default function DistribucionFuerza() {
   // Función para alternar entre analizar y pausar
   const toggleAnalysis = () => {
     if (!analyzing) {
-      // Inicia el análisis y la animación
       const durationMs = getDuration();
       const totalSecs = durationMs / 1000;
       setRemainingSeconds(totalSecs);
       setDigits(secondsToDigits(totalSecs));
       startAnimation();
       setAnalyzing(true);
-      // Inicia el contador: cada segundo se decrementa y se actualiza el display
       countdownInterval.current = setInterval(() => {
         setRemainingSeconds(prev => {
           if (prev <= 1) {
@@ -133,7 +130,6 @@ export default function DistribucionFuerza() {
         });
       }, 1000);
     } else {
-      // Pausa el análisis y la animación
       if (scanAnimRef.current) {
         scanAnimRef.current.stop();
       }
@@ -156,48 +152,56 @@ export default function DistribucionFuerza() {
   });
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#2b2b2b" />
-      
-      {/* Mitad superior: Solo la imagen del icono y la línea de escaneo */}
-      <View style={styles.topContainer}>
-        <View style={[styles.iconContainer, { height: iconContainerHeight }]}>
-          <Animated.Image 
-            source={require('./assets/icons/icon_insoles.png')} 
-            style={[styles.topImage, { tintColor: iconTint }]} 
-          />
-          <Animated.View style={[styles.scanLine, { top: lineTop }]} />
-        </View>
-      </View>
-      
-      {/* Mitad inferior: Contenedor con campo de tiempo, botones y botón Analizar */}
-      <View style={styles.bottomContainer}>
-        <View style={styles.timeSection}>
-          <Text style={styles.timeLabel}>Minutos</Text>
-          <View style={styles.timeInputRow}>
-            <TouchableOpacity onPress={decrementTime} style={styles.adjustButton}>
-              <Text style={styles.adjustButtonText}>–</Text>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: '#EAEAEA' }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 20}
+    >
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+        <View style={styles.container}>
+          <StatusBar barStyle="light-content" backgroundColor="#2b2b2b" />
+          
+          {/* Mitad superior: Solo la imagen del icono y la línea de escaneo */}
+          <View style={styles.topContainer}>
+            <View style={[styles.iconContainer, { height: iconContainerHeight }]}>
+              <Animated.Image 
+                source={require('./assets/icons/icon_insoles.png')} 
+                style={[styles.topImage, { tintColor: iconTint }]} 
+              />
+              <Animated.View style={[styles.scanLine, { top: lineTop }]} />
+            </View>
+          </View>
+          
+          {/* Mitad inferior: Contenedor con campo de tiempo, botones y botón Analizar */}
+          <View style={styles.bottomContainer}>
+            <View style={styles.timeSection}>
+              <Text style={styles.timeLabel}>Minutos</Text>
+              <View style={styles.timeInputRow}>
+                <TouchableOpacity onPress={decrementTime} style={styles.adjustButton}>
+                  <Text style={styles.adjustButtonText}>–</Text>
+                </TouchableOpacity>
+                <TextInput
+                  style={styles.timeInput}
+                  value={formatTime(digits)}
+                  onKeyPress={handleKeyPress}
+                  keyboardType="numeric"
+                  maxLength={5} // "MM:SS" tiene 5 caracteres
+                />
+                <TouchableOpacity onPress={incrementTime} style={styles.adjustButton}>
+                  <Text style={styles.adjustButtonText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.analyzeButton} onPress={toggleAnalysis}>
+              <Text style={styles.analyzeButtonText}>{analyzing ? "Pausar" : "Analizar"}</Text>
             </TouchableOpacity>
-            <TextInput
-              style={styles.timeInput}
-              value={formatTime(digits)}
-              onKeyPress={handleKeyPress}
-              keyboardType="numeric"
-              maxLength={5} // "MM:SS" tiene 5 caracteres
-            />
-            <TouchableOpacity onPress={incrementTime} style={styles.adjustButton}>
-              <Text style={styles.adjustButtonText}>+</Text>
-            </TouchableOpacity>
+            <View style={styles.messageContainer}>
+              <Text style={styles.messageText}>Mensaje</Text>
+            </View>
           </View>
         </View>
-        <TouchableOpacity style={styles.analyzeButton} onPress={toggleAnalysis}>
-          <Text style={styles.analyzeButtonText}>{analyzing ? "Pausar" : "Analizar"}</Text>
-        </TouchableOpacity>
-        <View style={styles.messageContainer}>
-          <Text style={styles.messageText}>Mensaje</Text>
-        </View>
-      </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -205,10 +209,10 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1, 
     backgroundColor: '#EAEAEA',
-    paddingTop: 120,   // Para evitar solapamiento con el top menu
-    paddingBottom: 120 // Para evitar solapamiento con el tab navigator
+    paddingBottom: 100, // Para evitar solapamiento con el tab navigator
   },
   topContainer: {
+    top: 50,
     flex: 0.5,
     justifyContent: 'center',
     alignItems: 'center',
@@ -231,12 +235,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
   bottomContainer: {
-    flex: 0.4, // Menos altura para el contenedor inferior
+    flex: 0.3, // Menos altura para el contenedor inferior
     backgroundColor: '#fff',
     borderRadius: 10, 
     padding: 20,
     marginHorizontal: 20,
-    marginTop: 20,
+    marginTop: 60,
     justifyContent: 'center',
     alignItems: 'center',
   },
